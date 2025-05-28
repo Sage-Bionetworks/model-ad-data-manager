@@ -1,0 +1,35 @@
+name: main
+
+on:
+  pull_request:
+    branches: ['*']
+  push:
+    branches: ['develop', 'staging', 'prod' ]
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pre-commit/action@v3.0.0
+
+  deploy:
+    if: ${{ github.event_name == 'push' }}
+    needs: ["tests"]
+    # self hosted runner labels are setup in github to match branch names
+    runs-on: [self-hosted, "${{ github.ref_name }}"]
+    # variables in context environments are setup in github to match branch names
+    environment:
+      name: ${{ github.ref_name }}
+
+    steps:
+      # use older checkout version due to https://github.com/dawidd6/action-download-artifact/issues/261
+      - uses: actions/checkout@v2
+      - name: Import Synapse Data
+        run: ./import-data.sh $BRANCH $SYNAPSE_PASSWORD $DB_HOST $DB_USER $DB_PASS
+        env:
+          BRANCH: ${{ github.ref_name }}
+          SYNAPSE_PASSWORD: ${{ secrets.SYNAPSE_PASSWORD }}
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASS: ${{ secrets.DB_PASS }}
