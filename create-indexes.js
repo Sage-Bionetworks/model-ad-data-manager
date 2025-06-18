@@ -29,7 +29,6 @@ const collections = [
             { model: 1 },
         ]
     }
-
 ];
 
 let results;
