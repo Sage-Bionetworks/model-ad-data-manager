@@ -16,7 +16,20 @@ const collections = [
         indexes: [
             { page: 1 },
         ]
+    },
+    {
+        name: 'modeloverview',
+        indexes: [
+            { model: 1 },
+        ]
+    },
+    {
+        name: 'diseasecorrelation',
+        indexes: [
+            { model: 1 },
+        ]
     }
+
 ];
 
 let results;

@@ -51,6 +51,8 @@ fi
 
 mongoimport -h $DB_HOST -d model-ad -u $DB_USER -p $DB_PASS --authenticationDatabase admin --collection modeldetails --jsonArray --drop --file $DATA_DIR/model_details.json
 mongoimport -h $DB_HOST -d model-ad -u $DB_USER -p $DB_PASS --authenticationDatabase admin --collection uiconfig --jsonArray --drop --file $DATA_DIR/ui_config.json
+mongoimport -h $DB_HOST -d model-ad -u $DB_USER -p $DB_PASS --authenticationDatabase admin --collection modeloverview --jsonArray --drop --file $DATA_DIR/model_overview.json
+mongoimport -h $DB_HOST -d model-ad -u $DB_USER -p $DB_PASS --authenticationDatabase admin --collection diseasecorrelation --jsonArray --drop --file $DATA_DIR/disease_correlation.json
 
 echo "Importing dataversion from ${DATAVERSION_PATH}"
 mongoimport -h $DB_HOST -d model-ad -u $DB_USER -p $DB_PASS --authenticationDatabase admin --collection dataversion $DATAVERSION_FLAG --drop --file $DATAVERSION_PATH
