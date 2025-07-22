@@ -46,15 +46,17 @@ if [ ! -f "${DATAVERSION_PATH}" ]; then
   DATAVERSION_FLAG=""
 fi
 
-# Import synapse data to database
-# Not using --mode upsert for now because we don't have unique indexes properly set for the collections
+# Drop and recreate the entire database to ensure clean state
+echo "Dropping and recreating model-ad database..."
+mongosh --host $DB_HOST -u $DB_USER -p $DB_PASS --authenticationDatabase admin --eval "db.getSiblingDB('model-ad').dropDatabase()"
 
-mongoimport -h $DB_HOST -d model-ad -u $DB_USER -p $DB_PASS --authenticationDatabase admin --collection model_details --jsonArray --drop --file $DATA_DIR/model_details.json
-mongoimport -h $DB_HOST -d model-ad -u $DB_USER -p $DB_PASS --authenticationDatabase admin --collection ui_config --jsonArray --drop --file $DATA_DIR/ui_config.json
-mongoimport -h $DB_HOST -d model-ad -u $DB_USER -p $DB_PASS --authenticationDatabase admin --collection model_overview --jsonArray --drop --file $DATA_DIR/model_overview.json
-mongoimport -h $DB_HOST -d model-ad -u $DB_USER -p $DB_PASS --authenticationDatabase admin --collection disease_correlation --jsonArray --drop --file $DATA_DIR/disease_correlation.json
+# Import synapse data to database
+mongoimport -h $DB_HOST -d model-ad -u $DB_USER -p $DB_PASS --authenticationDatabase admin --collection model_details --jsonArray --file $DATA_DIR/model_details.json
+mongoimport -h $DB_HOST -d model-ad -u $DB_USER -p $DB_PASS --authenticationDatabase admin --collection ui_config --jsonArray --file $DATA_DIR/ui_config.json
+mongoimport -h $DB_HOST -d model-ad -u $DB_USER -p $DB_PASS --authenticationDatabase admin --collection model_overview --jsonArray --file $DATA_DIR/model_overview.json
+mongoimport -h $DB_HOST -d model-ad -u $DB_USER -p $DB_PASS --authenticationDatabase admin --collection disease_correlation --jsonArray --file $DATA_DIR/disease_correlation.json
 
 echo "Importing dataversion from ${DATAVERSION_PATH}"
-mongoimport -h $DB_HOST -d model-ad -u $DB_USER -p $DB_PASS --authenticationDatabase admin --collection dataversion $DATAVERSION_FLAG --drop --file $DATAVERSION_PATH
+mongoimport -h $DB_HOST -d model-ad -u $DB_USER -p $DB_PASS --authenticationDatabase admin --collection dataversion $DATAVERSION_FLAG --file $DATAVERSION_PATH
 
 mongosh --host $DB_HOST -u $DB_USER -p $DB_PASS --authenticationDatabase admin $WORKING_DIR/create-indexes.js
