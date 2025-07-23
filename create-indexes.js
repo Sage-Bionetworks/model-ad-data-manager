@@ -6,25 +6,25 @@ print('');
 
 const collections = [
     {
-        name: 'modeldetails',
+        name: 'model_details',
         indexes: [
             { model: 1 },
         ]
     },
     {
-        name: 'uiconfig',
+        name: 'ui_config',
         indexes: [
             { page: 1 },
         ]
     },
     {
-        name: 'modeloverview',
+        name: 'model_overview',
         indexes: [
             { model: 1 },
         ]
     },
     {
-        name: 'diseasecorrelation',
+        name: 'disease_correlation',
         indexes: [
             { model: 1 },
         ]
