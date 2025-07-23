@@ -1,6 +1,6 @@
 # This script gets data from synapse then imports the data to an model-ad DB.
-# This script needs to be run from an model-ad bastian machine, it assumes that
-# the bastian is already setup with synapse, mongoimport and mongofiles
+# This script needs to be run from an model-ad bastion machine, it assumes that
+# the bastion is already setup with synapse, mongoimport and mongofiles
 # command line clients
 #!/bin/bash
 set -e
