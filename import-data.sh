@@ -2,8 +2,22 @@
 # This script needs to be run from an model-ad bastion machine, it assumes that
 # the bastion is already setup with synapse, mongoimport and mongofiles
 # command line clients
+
+# INSTRUCTIONS
+##############################################################################################
+# Update the COLLECTIONS array below with the names of the collections you want to import.
+##############################################################################################
+
 #!/bin/bash
 set -euo pipefail  # -e (exit on error), -u (treat unset variables as an error), -o pipefail (fail if any command in a pipeline fails)
+
+# Define collections to import (dataversion collection is handled separately)
+readonly COLLECTIONS=(
+    "model_details"
+    "ui_config"
+    "model_overview"
+    "disease_correlation"
+)
 
 # Validate required arguments
 if [ $# -ne 5 ]; then
@@ -40,14 +54,6 @@ error() {
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly WORKING_DIR="${SCRIPT_DIR}"
 readonly DATA_DIR="${WORKING_DIR}/data"
-
-# Define collections to import (dataversion collection is handled separately)
-readonly COLLECTIONS=(
-    "model_details"
-    "ui_config"
-    "model_overview"
-    "disease_correlation"
-)
 
 # Expected collections for orphaned cleanup (includes dataversion)
 readonly EXPECTED_COLLECTIONS=("${COLLECTIONS[@]}" "dataversion")
