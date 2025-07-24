@@ -41,7 +41,7 @@ readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly WORKING_DIR="${SCRIPT_DIR}"
 readonly DATA_DIR="${WORKING_DIR}/data"
 
-# Define collections to import (order matters for dependencies)
+# Define collections to import (dataversion collection is handled separately)
 readonly COLLECTIONS=(
     "model_details"
     "ui_config"
