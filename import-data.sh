@@ -44,7 +44,7 @@ readonly DATA_DIR="${WORKING_DIR}/data"
 # Define collections to import (order matters for dependencies)
 readonly COLLECTIONS=(
     "model_details"
-    "ui_config" 
+    "ui_config"
     "model_overview"
     "disease_correlation"
 )
@@ -74,7 +74,7 @@ if command -v jq &> /dev/null; then
     log "Using jq for JSON parsing"
     DATA_VERSION=$(jq -r '.data_version' "$WORKING_DIR/data-manifest.json")
     DATA_FILE=$(jq -r '.data_file' "$WORKING_DIR/data-manifest.json")
-    
+
     if [ "$DATA_VERSION" = "null" ] || [ "$DATA_FILE" = "null" ]; then
         error "Could not parse data_version or data_file from manifest"
         exit 1
@@ -148,22 +148,22 @@ DB_START_TIME=$(date +%s)
 # Function to clean up orphaned collections
 cleanup_orphaned_collections() {
     log "Checking for orphaned collections..."
-    
+
     # Get list of existing collections (excluding system collections)
     existing_collections=$(mongosh "$MONGO_URI" --quiet --eval "
         db.getCollectionNames()
             .filter(name => !name.startsWith('system.'))
             .join(' ')
     " 2>/dev/null || echo "")
-    
+
     if [ -z "$existing_collections" ]; then
         log "No existing collections found"
         return 0
     fi
-    
+
     # Track cleanup issues but don't fail the entire script
     cleanup_warnings=0
-    
+
     # Check each existing collection against expected list
     for collection in $existing_collections; do
         is_expected=false
@@ -173,10 +173,10 @@ cleanup_orphaned_collections() {
                 break
             fi
         done
-        
+
         if [ "$is_expected" = false ]; then
             warn "Found orphaned collection: $collection - removing..."
-            
+
             # Try to drop the collection with simple error handling
             if mongosh "$MONGO_URI" --eval "db.getCollection('$collection').drop()" >/dev/null 2>&1; then
                 log "Removed orphaned collection: $collection"
@@ -186,7 +186,7 @@ cleanup_orphaned_collections() {
             fi
         fi
     done
-    
+
     if [ $cleanup_warnings -gt 0 ]; then
         warn "Orphaned collection cleanup completed with $cleanup_warnings warnings"
     else
@@ -202,16 +202,16 @@ import_collection() {
     local collection=$1
     local file=$2
     local flags=${3:-"--jsonArray"}
-    
+
     if [ ! -f "$file" ]; then
         warn "File $file not found, skipping collection $collection"
         return 0
     fi
-    
+
     log "Replacing collection: $collection from $file"
     # Drop just this collection to ensure clean state
     mongosh "$MONGO_URI" --eval "db.getCollection('$collection').drop()" >/dev/null 2>&1
-    
+
     if ! mongoimport --uri="$MONGO_URI" --collection "$collection" $flags --file "$file"; then
         error "Failed to import collection $collection"
         exit 1
