@@ -27,7 +27,19 @@ readonly COLLECTIONS=(
 # Database Configuration
 readonly DB_NAME="model-ad"  # Target database name
 
+# Expected collections that will be cross-checked before import (including dataversion)
+readonly EXPECTED_COLLECTIONS=("${COLLECTIONS[@]}" "dataversion")
+
 # Don't forget to add indexes in create-indexes.js
+
+################################################################################
+# PATH CONFIGURATION
+################################################################################
+
+# Setup paths and directories (needed early for sourcing utilities)
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly WORKING_DIR="${SCRIPT_DIR}"
+readonly DATA_DIR="${WORKING_DIR}/data"
 
 ################################################################################
 # SCRIPT ARGUMENTS AND VALIDATION
@@ -47,11 +59,11 @@ if [ $# -ne 5 ]; then
 fi
 
 # Assign and validate arguments
-readonly BRANCH="$1"
-readonly SYNAPSE_PASSWORD="$2"
-readonly DB_HOST="$3"
-readonly DB_USER="$4"
-readonly DB_PASS="$5"
+BRANCH="$1"
+SYNAPSE_PASSWORD="$2"
+DB_HOST="$3"
+DB_USER="$4"
+DB_PASS="$5"
 
 # Validate non-empty arguments
 for arg_name in BRANCH SYNAPSE_PASSWORD DB_HOST DB_USER DB_PASS; do
@@ -61,23 +73,42 @@ for arg_name in BRANCH SYNAPSE_PASSWORD DB_HOST DB_USER DB_PASS; do
     fi
 done
 
+# Security: Prevent credential variables from being exported to child processes
+export -n SYNAPSE_PASSWORD DB_USER DB_PASS 2>/dev/null || true
+
 ################################################################################
 # SETUP AND INITIALIZATION
 ################################################################################
 
-# Create secure MongoDB connection string - connect to target database
-MONGO_URI="mongodb://${DB_USER}:${DB_PASS}@${DB_HOST}/${DB_NAME}?authSource=admin"
+# Create secure MongoDB connection string - credentials passed separately
+readonly MONGO_URI="mongodb://${DB_HOST}/${DB_NAME}?authSource=admin"
+readonly MONGO_USER="$DB_USER"
+readonly MONGO_PASS="$DB_PASS"
 
-# Setup paths and directories (needed early for sourcing utilities)
-readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-readonly WORKING_DIR="${SCRIPT_DIR}"
-readonly DATA_DIR="${WORKING_DIR}/data"
+# Clear original credential variables for security
+unset DB_USER DB_PASS
 
 # Source logging utilities
-if [ -f "${SCRIPT_DIR}/logging-utils.sh" ]; then
-    source "${SCRIPT_DIR}/logging-utils.sh"
+if [ -f "${SCRIPT_DIR}/utils/logging-utils.sh" ]; then
+    source "${SCRIPT_DIR}/utils/logging-utils.sh"
 else
-    echo "Error: logging-utils.sh not found"
+    echo "Error: utils/logging-utils.sh not found"
+    exit 1
+fi
+
+# Source synapse utilities
+if [ -f "${SCRIPT_DIR}/utils/synapse-utils.sh" ]; then
+    source "${SCRIPT_DIR}/utils/synapse-utils.sh"
+else
+    error "utils/synapse-utils.sh not found"
+    exit 1
+fi
+
+# Source database utilities
+if [ -f "${SCRIPT_DIR}/utils/database-utils.sh" ]; then
+    source "${SCRIPT_DIR}/utils/database-utils.sh"
+else
+    error "utils/database-utils.sh not found"
     exit 1
 fi
 
@@ -127,34 +158,13 @@ fi
 # MANIFEST PARSING AND CONFIGURATION
 ################################################################################
 
-# Parse JSON data from manifest with improved error handling
-parse_manifest_data() {
-    local manifest_file="$1"
-
-    log "Parsing JSON manifest using built-in tools"
-    DATA_VERSION=$(grep -o '"data_version"[[:space:]]*:[[:space:]]*"[^"]*"' "$manifest_file" | sed 's/.*"\([^"]*\)".*/\1/' | head -1)
-    DATA_FILE=$(grep -o '"data_file"[[:space:]]*:[[:space:]]*"[^"]*"' "$manifest_file" | sed 's/.*"\([^"]*\)".*/\1/' | head -1)
-
-    if [ -z "$DATA_VERSION" ] || [ -z "$DATA_FILE" ]; then
-        error "Could not parse data_version or data_file from manifest"
-        error "Please ensure the manifest file contains valid JSON with data_version and data_file fields"
-        exit 1
-    fi
-
-    log "Parsed: DATA_VERSION = $DATA_VERSION, DATA_FILE = $DATA_FILE"
-}
-
 parse_manifest_data "$WORKING_DIR/data-manifest.json"
-
-# Expected collections that will be cross-checked before import
-readonly EXPECTED_COLLECTIONS=("${COLLECTIONS[@]}" "dataversion")
 
 log "$BRANCH branch, DATA_VERSION = $DATA_VERSION, manifest id = $DATA_FILE"
 
 # Display what will be processed
 log "=== Import Configuration ==="
 log "Collections to import: ${COLLECTIONS[*]}"
-log "Target database: $DB_NAME on $DB_HOST"
 log "Expected collections after import: ${EXPECTED_COLLECTIONS[*]}"
 log "==============================="
 
@@ -162,58 +172,25 @@ log "==============================="
 # SYNAPSE DATA DOWNLOAD
 ################################################################################
 
-# Download the manifest file from synapse
-log "Downloading manifest file from Synapse..."
+# Validate Synapse CLI is available
+if ! validate_synapse_cli; then
+    exit 1
+fi
 
 # Start synapse operations timing
 SYNAPSE_START_TIME=$(date +%s)
 
-if ! synapse -p "$SYNAPSE_PASSWORD" get --downloadLocation "$DATA_DIR" -v "$DATA_VERSION" "$DATA_FILE"; then
-    error "Failed to download manifest file"
+# Download all Synapse data
+if ! download_synapse_data "$SYNAPSE_PASSWORD" "$DATA_DIR" "$DATA_VERSION" "$DATA_FILE"; then
     exit 1
-fi
-
-# Validate manifest CSV exists
-if [ ! -f "$DATA_DIR/data_manifest.csv" ]; then
-    error "data_manifest.csv not found after download"
-    exit 1
-fi
-
-# Download all files referenced in the manifest from synapse
-total_files=$(tail -n +2 "$DATA_DIR/data_manifest.csv" | wc -l)
-log "Downloading $total_files files from manifest..."
-
-current_file=0
-failed_downloads=0
-while IFS=, read -r id version; do
-    current_file=$((current_file + 1))
-    progress_percent=$((current_file * 100 / total_files))
-    log "[$progress_percent%] Downloading file $current_file/$total_files: $id,$version"
-
-    if ! synapse -p "$SYNAPSE_PASSWORD" get --downloadLocation "$DATA_DIR" -v "$version" "$id"; then
-        error "Failed to download file $id,$version"
-        failed_downloads=$((failed_downloads + 1))
-
-        # Allow a few failed downloads before giving up
-        if [ $failed_downloads -gt 3 ]; then
-            error "Too many download failures ($failed_downloads). Aborting."
-            exit 1
-        fi
-        warn "Continuing despite download failure ($failed_downloads/3 allowed failures)"
-    fi
-done < <(tail -n +2 "$DATA_DIR/data_manifest.csv")
-
-if [ $failed_downloads -gt 0 ]; then
-    warn "Completed downloads with $failed_downloads failures"
 fi
 
 # Calculate synapse download time
 SYNAPSE_END_TIME=$(date +%s)
 SYNAPSE_DURATION=$((SYNAPSE_END_TIME - SYNAPSE_START_TIME))
 
-log "Data download completed. Listing files:"
-ls -al "$WORKING_DIR"
-ls -al "$DATA_DIR"
+# List downloaded files for verification
+list_downloaded_files "$WORKING_DIR" "$DATA_DIR"
 
 ################################################################################
 # DATABASE OPERATIONS
@@ -227,16 +204,8 @@ if [ ! -f "${DATAVERSION_PATH}" ]; then
   DATAVERSION_FLAG=""
 fi
 
-# Source the database utility functions
-if [ -f "${SCRIPT_DIR}/database-utils.sh" ]; then
-    source "${SCRIPT_DIR}/database-utils.sh"
-else
-    error "database-utils.sh not found"
-    exit 1
-fi
-
 # Test database connectivity
-if ! test_database_connection "$MONGO_URI"; then
+if ! test_database_connection "$MONGO_URI" "$MONGO_USER" "$MONGO_PASS"; then
     exit 1
 fi
 
@@ -244,7 +213,7 @@ fi
 DB_START_TIME=$(date +%s)
 
 # Clean up orphaned collections before import
-cleanup_orphaned_collections "$MONGO_URI" "${EXPECTED_COLLECTIONS[@]}"
+cleanup_orphaned_collections "$MONGO_URI" "$MONGO_USER" "$MONGO_PASS" "${EXPECTED_COLLECTIONS[@]}"
 
 ################################################################################
 # DATA IMPORT
@@ -256,14 +225,14 @@ log "Starting MongoDB data import..."
 # Import collections from array
 for collection in "${COLLECTIONS[@]}"; do
     file="${DATA_DIR}/${collection}.json"
-    import_collection "$MONGO_URI" "$collection" "$file" "--jsonArray"
+    import_collection "$MONGO_URI" "$MONGO_USER" "$MONGO_PASS" "$collection" "$file" "--jsonArray"
 done
 
 log "Importing dataversion from ${DATAVERSION_PATH}"
-import_collection "$MONGO_URI" "dataversion" "$DATAVERSION_PATH" "$DATAVERSION_FLAG"
+import_collection "$MONGO_URI" "$MONGO_USER" "$MONGO_PASS" "dataversion" "$DATAVERSION_PATH" "$DATAVERSION_FLAG"
 
 # Create database indexes
-create_database_indexes "$MONGO_URI" "$WORKING_DIR/create-indexes.js"
+create_database_indexes "$MONGO_URI" "$MONGO_USER" "$MONGO_PASS" "$WORKING_DIR/create-indexes.js"
 
 ################################################################################
 # COMPLETION AND SUMMARY
