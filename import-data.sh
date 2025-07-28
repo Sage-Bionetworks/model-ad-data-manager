@@ -68,7 +68,7 @@ DB_PASS="$5"
 # Validate non-empty arguments
 for arg_name in BRANCH SYNAPSE_PASSWORD DB_HOST DB_USER DB_PASS; do
     if [ -z "${!arg_name}" ]; then
-        echo "Error: $arg_name cannot be empty"
+        error "Error: $arg_name cannot be empty"
         exit 1
     fi
 done
@@ -92,7 +92,7 @@ unset DB_USER DB_PASS
 if [ -f "${SCRIPT_DIR}/utils/logging-utils.sh" ]; then
     source "${SCRIPT_DIR}/utils/logging-utils.sh"
 else
-    echo "Error: utils/logging-utils.sh not found"
+    error "Error: utils/logging-utils.sh not found"
     exit 1
 fi
 
@@ -164,7 +164,6 @@ log "$BRANCH branch, DATA_VERSION = $DATA_VERSION, manifest id = $DATA_FILE"
 
 # Display what will be processed
 log "=== Import Configuration ==="
-log "Collections to import: ${COLLECTIONS[*]}"
 log "Expected collections after import: ${EXPECTED_COLLECTIONS[*]}"
 log "==============================="
 

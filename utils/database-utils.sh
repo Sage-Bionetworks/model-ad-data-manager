@@ -1,8 +1,9 @@
 #!/bin/bash
 # Database utility functions for MongoDB operations
 # This script contains reusable functions for database cleanup and import operations
-#
-# SECURITY NOTE: All functions now accept credentials as separate parameters
+# Requires logging-utils.sh to be sourced for log, warn, and error functions
+
+# SECURITY NOTE: All functions accept credentials as separate parameters
 # instead of embedded in URIs to prevent credential exposure in process lists
 
 # Function to clean up orphaned collections from MongoDB
