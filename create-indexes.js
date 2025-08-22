@@ -8,7 +8,7 @@ const collections = [
     {
         name: 'model_details',
         indexes: [
-            { model: 1 },
+            { name: 1 },
         ]
     },
     {
@@ -20,13 +20,13 @@ const collections = [
     {
         name: 'model_overview',
         indexes: [
-            { model: 1 },
+            { name: 1 },
         ]
     },
     {
         name: 'disease_correlation',
         indexes: [
-            { model: 1 },
+            { name: 1 },
         ]
     }
 ];
