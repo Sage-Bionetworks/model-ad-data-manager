@@ -102,10 +102,8 @@ import_collection() {
     fi
 
     log "Replacing collection: $collection from $file"
-    # Drop just this collection to ensure clean state
-    mongosh "$mongo_uri" --username "$mongo_user" --password "$mongo_pass" --eval "db.getCollection('$collection').drop()" >/dev/null 2>&1
-
-    if ! mongoimport --uri="$mongo_uri" --username "$mongo_user" --password "$mongo_pass" --collection "$collection" $flags --file "$file"; then
+    # Use --drop flag to let mongoimport handle dropping the collection if it exists
+    if ! mongoimport --uri="$mongo_uri" --username "$mongo_user" --password "$mongo_pass" --collection "$collection" --drop $flags --file "$file"; then
         error "Failed to import collection $collection"
         exit 1
     fi
