@@ -28,6 +28,12 @@ const collections = [
         indexes: [
             { name: 1 },
         ]
+    },
+    {
+        name: "rna_de_aggregate",
+        indexes: [
+            { ensembl_gene_id: 1 }
+        ]
     }
 ];
 
