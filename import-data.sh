@@ -22,6 +22,7 @@ readonly COLLECTIONS=(
     "ui_config"
     "model_overview"
     "disease_correlation"
+    "rna_de_aggregate"
 )
 
 # Database Configuration
