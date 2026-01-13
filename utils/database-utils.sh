@@ -103,7 +103,8 @@ import_collection() {
 
     log "Replacing collection: $collection from $file"
     # Use --drop flag to let mongoimport handle dropping the collection if it exists
-    if ! mongoimport --uri="$mongo_uri" --username "$mongo_user" --password "$mongo_pass" --collection "$collection" --drop $flags --file "$file"; then
+    # Use --maintainInsertionOrder to insert documents in the order they appear in the file
+    if ! mongoimport --uri="$mongo_uri" --username "$mongo_user" --password "$mongo_pass" --collection "$collection" --drop $flags --file "$file" --maintainInsertionOrder; then
         error "Failed to import collection $collection"
         exit 1
     fi
