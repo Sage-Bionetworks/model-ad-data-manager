@@ -36,6 +36,13 @@ const collections = [
             { ensembl_gene_id: 1 },
             { tissue: 1, sex_cohort: 1, ensembl_gene_id: 1, name: 1 },
         ]
+    },
+    {
+        name: "rna_de_individual",
+        indexes: [
+            { ensembl_gene_id: 1 },
+            { ensembl_gene_id: 1, tissue: 1, name: 1, model_group: 1 },
+        ]
     }
 ];
 
