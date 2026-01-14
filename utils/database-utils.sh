@@ -102,8 +102,15 @@ import_collection() {
     fi
 
     log "Replacing collection: $collection from $file"
+
+    # Use --maintainInsertionOrder for ui_config to preserve order of UI elements
+    local order_flag=""
+    if [ "$collection" = "ui_config" ]; then
+        order_flag="--maintainInsertionOrder"
+    fi
+
     # Use --drop flag to let mongoimport handle dropping the collection if it exists
-    if ! mongoimport --uri="$mongo_uri" --username "$mongo_user" --password "$mongo_pass" --collection "$collection" --drop $flags --file "$file"; then
+    if ! mongoimport --uri="$mongo_uri" --username "$mongo_user" --password "$mongo_pass" --collection "$collection" --drop $flags --file "$file" $order_flag; then
         error "Failed to import collection $collection"
         exit 1
     fi
