@@ -23,6 +23,7 @@ readonly COLLECTIONS=(
     "model_overview"
     "disease_correlation"
     "rna_de_aggregate"
+    "rna_de_individual"
 )
 
 # Database Configuration
