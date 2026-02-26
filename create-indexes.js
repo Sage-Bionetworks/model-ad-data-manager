@@ -6,15 +6,42 @@ print('');
 
 const collections = [
     {
-        name: 'modeldetails',
+        name: 'model_details',
         indexes: [
-            { model: 1 },
+            { name: 1 },
         ]
     },
     {
-        name: 'uiconfig',
+        name: 'ui_config',
         indexes: [
             { page: 1 },
+        ]
+    },
+    {
+        name: 'model_overview',
+        indexes: [
+            { name: 1 },
+        ]
+    },
+    {
+        name: 'disease_correlation',
+        indexes: [
+            { name: 1 },
+            { cluster: 1, name: 1, age: 1, sex: 1 },
+        ]
+    },
+    {
+        name: "rna_de_aggregate",
+        indexes: [
+            { ensembl_gene_id: 1 },
+            { tissue: 1, sex_cohort: 1, ensembl_gene_id: 1, name: 1 },
+        ]
+    },
+    {
+        name: "rna_de_individual",
+        indexes: [
+            { ensembl_gene_id: 1 },
+            { ensembl_gene_id: 1, tissue: 1, name: 1, model_group: 1 },
         ]
     }
 ];
