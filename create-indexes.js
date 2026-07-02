@@ -4,17 +4,7 @@ print('');
 print('Creating indexes for "' + db.getName() + '"');
 print('');
 
-// DocumentDB 8.0 requires a collation to be used in at least one collection
-// or index before it can be referenced in queries. Registration is cluster-wide
-// and permanent.
 const collation = { locale: 'en', strength: 2 };
-if (db.getCollectionNames().indexOf('_collation_config') === -1) {
-    db.createCollection('_collation_config', { collation: collation });
-    print('Registered case-insensitive collation');
-} else {
-    print('Collation already registered');
-}
-print('');
 
 const collections = [
     {
@@ -33,6 +23,9 @@ const collections = [
         name: 'model_overview',
         indexes: [
             { name: 1 },
+        ],
+        collatedIndexes: [
+            { name: 1 }
         ]
     },
     {
@@ -40,6 +33,9 @@ const collections = [
         indexes: [
             { name: 1 },
             { cluster: 1, name: 1, age: 1, sex: 1 },
+        ],
+        collatedIndexes: [
+            { cluster: 1 }
         ]
     },
     {
@@ -47,6 +43,9 @@ const collections = [
         indexes: [
             { ensembl_gene_id: 1 },
             { tissue: 1, sex_cohort: 1, ensembl_gene_id: 1, name: 1 },
+        ],
+        collatedIndexes: [
+            { tissue: 1, sex_cohort: 1 }
         ]
     },
     {
@@ -66,6 +65,17 @@ for (let collection of collections) {
         print('Creating index...');
         printjson(index);
         results = db[collection.name].createIndex(index);
+        if (results && results.ok === 1) {
+            print(results.numIndexesBefore < results.numIndexesAfter ? 'Success!' : 'Index already exists.');
+        }
+        else {
+            print('Failed: ' + results.note ? results.note : 'N/A');
+        }
+    }
+    for (let index of (collection.collatedIndexes || [])) {
+        const name = Object.keys(index).map(k => k + '_' + index[k]).join('_') + '_ci';
+        print('Creating collated index: ' + name);
+        results = db[collection.name].createIndex(index, { name: name, collation: collation });
         if (results && results.ok === 1) {
             print(results.numIndexesBefore < results.numIndexesAfter ? 'Success!' : 'Index already exists.');
         }
