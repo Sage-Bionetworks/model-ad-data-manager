@@ -4,6 +4,18 @@ print('');
 print('Creating indexes for "' + db.getName() + '"');
 print('');
 
+// DocumentDB 8.0 requires a collation to be used in at least one collection
+// or index before it can be referenced in queries. Registration is cluster-wide
+// and permanent.
+const collation = { locale: 'en', strength: 2 };
+if (db.getCollectionNames().indexOf('_collation_config') === -1) {
+    db.createCollection('_collation_config', { collation: collation });
+    print('Registered case-insensitive collation');
+} else {
+    print('Collation already registered');
+}
+print('');
+
 const collections = [
     {
         name: 'model_details',
