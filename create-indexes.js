@@ -73,7 +73,7 @@ for (let collection of collections) {
         }
     }
     for (let index of (collection.collatedIndexes || [])) {
-        const name = Object.keys(index).map(k => k + '_' + index[k]).join('_') + '_ci';
+        const name = Object.keys(index).map(k => k + '_' + index[k]).join('_') + '_collated';
         print('Creating collated index: ' + name);
         results = db[collection.name].createIndex(index, { name: name, collation: collation });
         if (results && results.ok === 1) {
