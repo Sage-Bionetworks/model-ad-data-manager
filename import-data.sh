@@ -24,6 +24,9 @@ readonly COLLECTIONS=(
     "disease_correlation"
     "rna_de_aggregate"
     "rna_de_individual"
+    "marmo_details"
+    "marmo_overview"
+    "protein_de_aggregate"
 )
 
 # Database Configuration
