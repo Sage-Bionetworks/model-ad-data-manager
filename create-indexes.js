@@ -28,7 +28,7 @@ const collections = [
     name: "rna_de_aggregate",
     indexes: [
       { ensembl_gene_id: 1 },
-      { tissue: 1, ensembl_gene_id: 1, name: 1 },
+      { tissue: 1, ensembl_gene_id: 1, "name.link_text": 1, sex: 1 },
     ],
     collatedIndexes: [{ tissue: 1 }],
   },
