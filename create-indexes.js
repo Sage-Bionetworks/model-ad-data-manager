@@ -21,16 +21,15 @@ const collections = [
   },
   {
     name: "disease_correlation",
-    indexes: [{ name: 1 }, { cluster: 1, name: 1, age: 1, sex: 1 }],
-    collatedIndexes: [{ cluster: 1 }],
+    indexes: [{ name: 1 }],
+    collatedIndexes: [{ cluster: 1, name: 1, age: 1, sex: 1 }],
   },
   {
     name: "rna_de_aggregate",
-    indexes: [
-      { ensembl_gene_id: 1 },
+    indexes: [{ ensembl_gene_id: 1 }],
+    collatedIndexes: [
       { tissue: 1, ensembl_gene_id: 1, "name.link_text": 1, sex: 1 },
     ],
-    collatedIndexes: [{ tissue: 1 }],
   },
   {
     name: "rna_de_individual",
@@ -50,6 +49,7 @@ const collections = [
   {
     name: "protein_de_aggregate",
     indexes: [{ unique_id: 1 }],
+    collatedIndexes: [{ tissue: 1, unique_id: 1, "name.link_text": 1, sex: 1 }],
   },
 ];
 
@@ -57,7 +57,7 @@ let results;
 
 for (let collection of collections) {
   print("Collection: " + collection.name);
-  for (let index of (collection.indexes || [])) {
+  for (let index of collection.indexes || []) {
     print("Creating index...");
     printjson(index);
     results = db[collection.name].createIndex(index);
