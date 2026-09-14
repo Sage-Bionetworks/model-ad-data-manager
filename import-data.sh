@@ -27,6 +27,7 @@ readonly COLLECTIONS=(
     "marmo_details"
     "marmo_overview"
     "protein_de_aggregate"
+    "protein_de_individual"
 )
 
 # Database Configuration
