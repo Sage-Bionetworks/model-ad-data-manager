@@ -51,6 +51,13 @@ const collections = [
     indexes: [{ unique_id: 1 }],
     collatedIndexes: [{ tissue: 1, unique_id: 1, "name.link_text": 1, sex: 1 }],
   },
+  {
+    name: "protein_de_individual",
+    indexes: [
+      { unique_id: 1, tissue: 1, name: 1, model_group: 1 },
+      { unique_id: 1, model_group: 1, tissue: 1 },
+    ],
+  },
 ];
 
 let results;
