@@ -115,14 +115,17 @@ Enter name of work folder: [press Enter for _work]
 
 √ Settings Saved.
 ```
-* Setup the [GH runner agent to run as a service](https://docs.github.com/en/actions/hosting-your-own-runners/managing-self-hosted-runners/configuring-the-self-hosted-runner-application-as-a-service)
-* Make the service restart itself if it is killed for running out of memory. By default, systemd stops the whole service when any of its processes is killed by the out-of-memory (OOM) killer, and it stays stopped. Run `sudo systemctl edit actions.runner.Sage-Bionetworks-model-ad-data-manager.model-ad-bastion-<env>.service`, add the lines below, then run `sudo systemctl daemon-reload` and restart the service. This adds a separate drop-in file, so reinstalling the service doesn't undo it.
+* Before installing the service, make it restart itself if it is killed for running out of memory. By default, systemd stops the whole service when any of its processes is killed by the out-of-memory (OOM) killer, and it stays stopped. Paste this block as is. It applies to the runner service for every environment, so nothing needs changing per environment, and `svc.sh install` loads it.
 ```text
+sudo mkdir -p /etc/systemd/system/actions.runner.Sage-Bionetworks-model-ad-data-manager.model-ad-bastion-.service.d
+sudo tee /etc/systemd/system/actions.runner.Sage-Bionetworks-model-ad-data-manager.model-ad-bastion-.service.d/oom.conf <<'EOF'
 [Service]
 OOMPolicy=continue
 Restart=always
 RestartSec=15
+EOF
 ```
+* Setup the [GH runner agent to run as a service](https://docs.github.com/en/actions/hosting-your-own-runners/managing-self-hosted-runners/configuring-the-self-hosted-runner-application-as-a-service)
 * Run the agent and then check the [GH Runners page](https://github.com/Sage-Bionetworks/model-ad-data-manager/settings/actions/runners) to make sure that the runner is in `Idle` status.
 
 ### Troubleshooting self hosted runners
@@ -135,7 +138,7 @@ sudo journalctl -u 'actions.runner.*' -n 30 --no-pager
 
 | Message in the journal | Cause | Fix |
 | --- | --- | --- |
-| `killed by the OOM killer` and `Failed with result 'oom-kill'` | The bastion ran out of memory and systemd stopped the service | Add the drop-in above, then `sudo systemctl reset-failed 'actions.runner.*'` and `sudo ./svc.sh start` |
+| `killed by the OOM killer` and `Failed with result 'oom-kill'` | The bastion ran out of memory, for example during a Systems Manager patch run, and systemd stopped the service | Add the drop-in from the setup steps, then `sudo systemctl daemon-reload`, `sudo systemctl reset-failed 'actions.runner.*'` and `sudo ./svc.sh start` |
 | `The runner registration has been deleted from the server` | GitHub deletes runners that haven't connected for 14 days | Run `./config.sh remove --local` to clear the old configuration, then get a new token from the runners page and run `config.sh` again. Add `--replace` if GitHub still lists a runner with that name |
 
 The runner gives up after 10 failed retries in a row. After fixing the cause, start it again with `sudo ./svc.sh start`.
