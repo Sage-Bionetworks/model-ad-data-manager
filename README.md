@@ -136,15 +136,11 @@ sudo journalctl -u 'actions.runner.*' -n 30 --no-pager
 | Message in the journal | Cause | Fix |
 | --- | --- | --- |
 | `killed by the OOM killer` and `Failed with result 'oom-kill'` | The bastion ran out of memory and systemd stopped the service | Add the drop-in above, then `sudo systemctl reset-failed 'actions.runner.*'` and `sudo ./svc.sh start` |
-| `The runner registration has been deleted from the server` | GitHub deletes runners that haven't connected for 14 days | Get a new token from the runners page and run `config.sh` again. Add `--replace` if GitHub still lists a runner with that name |
-| `Access to the path '.../.credentials_rsaparams' is denied` | `config.sh` was run as root, so the service user can't read the credentials | `sudo chown -R ssm-user:ssm-user /home/ssm-user/actions-runner`, then `sudo ./svc.sh start` |
-| `Must not run with sudo` when running `config.sh` | `config.sh` refuses to run as root | Run it as `ssm-user`, without `sudo` |
+| `The runner registration has been deleted from the server` | GitHub deletes runners that haven't connected for 14 days | Run `./config.sh remove --local` to clear the old configuration, then get a new token from the runners page and run `config.sh` again. Add `--replace` if GitHub still lists a runner with that name |
 
 The runner gives up after 10 failed retries in a row. After fixing the cause, start it again with `sudo ./svc.sh start`.
 
 Because of the 14-day rule, a bastion left stopped for more than two weeks loses its registration. Before a release, check that the runner shows as `Idle`.
-
-Don't move the runner's install directory. When the runner updates itself, it points `bin` and `externals` at versioned directories (for example `bin.2.337.0`) using absolute paths, so a moved install fails with `Must run from runner root or install is corrupt`. If an install has been moved, repoint them from inside the new directory, for example `ln -sfn bin.2.337.0 bin` and `ln -sfn externals.2.337.0 externals`.
 
 [db_update]: model-ad-db-update.drawio.png "update diagram"
 [github_secrets]: github_secrets.png "github secrets screen"
