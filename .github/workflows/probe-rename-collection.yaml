@@ -37,9 +37,10 @@ jobs:
         run: |
           set -uo pipefail
 
-          # Same connection shape import-data.sh already uses, so the probe
-          # cannot fail for connection reasons
-          mongosh "mongodb://${DB_HOST}/model-ad?authSource=admin" \
+          # Same connection shape import-data.sh uses, plus retryWrites=false:
+          # DocumentDB only supports retryable writes from engine 8.0.2, and
+          # mongosh enables them by default, so without it every insert fails
+          mongosh "mongodb://${DB_HOST}/model-ad?authSource=admin&retryWrites=false" \
             --username "$DB_USER" \
             --password "$DB_PASS" \
             probe-rename-collection.js 2>&1 | tee probe-output.txt

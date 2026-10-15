@@ -190,8 +190,12 @@ try {
     verdict["rename without dropTarget (control)"] =
       "UNEXPECTED SUCCESS - the target was replaced without dropTarget";
   } catch (e) {
+    // Only NamespaceExists counts - any other error means the rename was
+    // never attempted, so the control says nothing
     verdict["rename without dropTarget (control)"] =
-      "REJECTED as expected (" + (e.codeName || e.name || "Error") + ")";
+      e.codeName === "NamespaceExists" || e.code === 48
+        ? "REJECTED as expected (NamespaceExists)"
+        : "INCONCLUSIVE - " + describeError(e);
   }
 } finally {
   try {
