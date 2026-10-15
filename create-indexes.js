@@ -1,7 +1,15 @@
 db = db.getSiblingDB("model-ad");
 
+// An import builds its indexes on the staging collections, which are then
+// renamed over the live collections, so the suffix is set to "_staging".
+// Defaults to the live collection names when run by hand.
+const suffix = process.env.COLLECTION_SUFFIX || "";
+
 print("");
 print('Creating indexes for "' + db.getName() + '"');
+if (suffix) {
+  print('Targeting collections with the "' + suffix + '" suffix');
+}
 print("");
 
 const collation = { locale: "en", strength: 2 };
@@ -63,11 +71,12 @@ const collections = [
 let results;
 
 for (let collection of collections) {
-  print("Collection: " + collection.name);
+  const name = collection.name + suffix;
+  print("Collection: " + name);
   for (let index of collection.indexes || []) {
     print("Creating index...");
     printjson(index);
-    results = db[collection.name].createIndex(index);
+    results = db[name].createIndex(index);
     if (results && results.ok === 1) {
       print(
         results.numIndexesBefore < results.numIndexesAfter
@@ -81,7 +90,7 @@ for (let collection of collections) {
   for (let index of collection.collatedIndexes || []) {
     print("Creating collated index...");
     printjson(index);
-    results = db[collection.name].createIndex(index, {
+    results = db[name].createIndex(index, {
       collation: collation,
     });
     if (results && results.ok === 1) {
