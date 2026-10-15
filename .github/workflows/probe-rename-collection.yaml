@@ -1,0 +1,65 @@
+name: probe-rename-collection
+
+# TEMPORARY DIAGNOSTIC (MG-1171) - remove once the verdict is recorded.
+#
+# Answers whether our DocumentDB engine supports renameCollection with
+# dropTarget, which the atomic import in MG-1171 depends on. It runs on the
+# develop bastion runner because that is the only host with network access to
+# the dev cluster, and it reads the develop environment secrets so no database
+# credentials have to be handled by hand.
+#
+# The paths filter keeps this off every other pull request.
+
+on:
+  pull_request:
+    paths:
+      - 'probe-rename-collection.js'
+      - '.github/workflows/probe-rename-collection.yaml'
+
+jobs:
+  probe:
+    # self hosted runner labels are setup in github to match branch names;
+    # hardcoded to develop here because github.ref_name is the feature branch
+    runs-on: [self-hosted, "develop"]
+    # variables in context environments are setup in github to match branch names
+    environment:
+      name: develop
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Probe renameCollection dropTarget support
+        shell: bash
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASS: ${{ secrets.DB_PASS }}
+        run: |
+          set -uo pipefail
+
+          # Same connection shape import-data.sh already uses, so the probe
+          # cannot fail for connection reasons
+          mongosh "mongodb://${DB_HOST}/model-ad?authSource=admin" \
+            --username "$DB_USER" \
+            --password "$DB_PASS" \
+            probe-rename-collection.js 2>&1 | tee probe-output.txt
+          status=${PIPESTATUS[0]}
+
+          # Surface the verdict on the checks page, not just in the raw log.
+          # The probe prints a verdict even when the answer is "unsupported",
+          # so a missing verdict means it could not run at all - show why.
+          {
+            echo '### MG-1171 renameCollection dropTarget probe (develop)'
+            echo ''
+            echo '```'
+            if grep -q '===== MG-1171 PROBE VERDICT =====' probe-output.txt; then
+              sed -n '/===== MG-1171 PROBE VERDICT =====/,/^=================================$/p' probe-output.txt
+            else
+              echo 'The probe produced no verdict. Last lines of its output:'
+              echo ''
+              tail -20 probe-output.txt
+            fi
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          exit "$status"
