@@ -28,6 +28,38 @@ To deploy an updated data version to the Model-AD production database:
 2. The Github action CI system automatically updates the dev DB
 
 
+# Atomic imports
+
+A data release reloads the database while the app and API containers keep
+running, so an import must never leave the APIs reading half-loaded data.
+`import-data.sh` therefore never writes to a live collection:
+
+1. Any staging collections left behind by a failed run are dropped.
+2. Each collection is imported into `<collection>_staging`, and its indexes
+   from `create-indexes.js` are built there.
+3. Every staging collection is checked for documents. If any is missing or
+   empty the run aborts, leaving the previous release live.
+4. Each staging collection is renamed over its live collection. A rename is a
+   metadata-only operation that also carries the indexes across, so a
+   collection goes straight from the previous release to the new one and is
+   never served unindexed.
+5. `dataversion` is renamed last, so it only changes once every other
+   collection is serving the new release.
+
+Two things to know when running a release:
+
+* The imported data is stored twice between step 2 and step 4, so check the
+  collection sizes against the cluster's free storage before a large release.
+* The renames run back to back in one database session but are not a single
+  transaction, so there is a window of milliseconds in which some collections
+  are on the new release and the rest are on the previous one.
+
+The swap relies on `renameCollection` with `dropTarget`, which Amazon
+DocumentDB does not document. It was verified on the dev cluster (engine
+8.0.0) in MG-1171, including that indexes and collation indexes carry across.
+The import connects with `retryWrites=false`, because DocumentDB only supports
+retryable writes from engine 8.0.2 and `mongosh` enables them by default.
+
 # Setup
 
 ## Secrets
