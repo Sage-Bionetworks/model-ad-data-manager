@@ -49,6 +49,15 @@ readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly WORKING_DIR="${SCRIPT_DIR}"
 readonly DATA_DIR="${WORKING_DIR}/data"
 
+# Source logging utilities first, so error() is defined for the argument checks
+# below. error() isn't available until this succeeds, so the fallback uses echo.
+if [ -f "${SCRIPT_DIR}/utils/logging-utils.sh" ]; then
+    source "${SCRIPT_DIR}/utils/logging-utils.sh"
+else
+    echo "Error: utils/logging-utils.sh not found" >&2
+    exit 1
+fi
+
 ################################################################################
 # SCRIPT ARGUMENTS AND VALIDATION
 ################################################################################
@@ -97,14 +106,6 @@ readonly MONGO_PASS="$DB_PASS"
 
 # Clear original credential variables for security
 unset DB_USER DB_PASS
-
-# Source logging utilities
-if [ -f "${SCRIPT_DIR}/utils/logging-utils.sh" ]; then
-    source "${SCRIPT_DIR}/utils/logging-utils.sh"
-else
-    error "Error: utils/logging-utils.sh not found"
-    exit 1
-fi
 
 # Source synapse utilities
 if [ -f "${SCRIPT_DIR}/utils/synapse-utils.sh" ]; then
