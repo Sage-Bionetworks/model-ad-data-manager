@@ -248,12 +248,26 @@ swap_staging_collections() {
     done <<< "$output"
 
     if [ $status -ne 0 ] || [ ${#swapped[@]} -ne ${#collections[@]} ]; then
-        error "Swap did not complete (${#swapped[@]} of ${#collections[@]} collections swapped)"
-        if [ ${#swapped[@]} -gt 0 ]; then
-            error "Already swapped to the new release: ${swapped[*]}"
+        if [ ${#swapped[@]} -eq 0 ]; then
+            error "Swap failed before any collection was swapped, so the previous release is still fully live"
+            error "Check the error above, then re-run the failed deploy job in GitHub Actions"
+            exit 1
         fi
-        error "Every other collection is still on the previous release"
-        error "dataversion was not updated, so the APIs will not pick up the new release"
+
+        local remaining=()
+        local collection
+        for collection in "${collections[@]}"; do
+            [[ " ${swapped[*]} " == *" $collection "* ]] || remaining+=("$collection")
+        done
+
+        error "Swap failed partway: ${#swapped[@]} of ${#collections[@]} collections were swapped before the error"
+        error "On the new release: ${swapped[*]}"
+        error "Still on the previous release: ${remaining[*]}"
+        error "The APIs are now serving a mix of the two releases. dataversion was not updated, so the API caches"
+        error "were not cleared: responses cached before the swap show the previous release, and the rest come from"
+        error "the database, which now has a mix of new and old collections"
+        error "To fix it, check the error above, then re-run the failed deploy job in GitHub Actions."
+        error "The re-run starts the import over, including the Synapse download"
         exit 1
     fi
 
