@@ -116,3 +116,6 @@ package-*.json
 
 # local AWS configuration/credentials
 .aws/
+
+# local scratch files
+tmp/
