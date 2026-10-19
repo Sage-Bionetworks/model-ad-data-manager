@@ -85,7 +85,7 @@ DB_PASS="$5"
 # Validate non-empty arguments
 for arg_name in BRANCH SYNAPSE_PASSWORD DB_HOST DB_USER DB_PASS; do
     if [ -z "${!arg_name}" ]; then
-        error "Error: $arg_name cannot be empty"
+        error "$arg_name cannot be empty"
         exit 1
     fi
 done
