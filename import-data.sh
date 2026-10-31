@@ -34,6 +34,8 @@ readonly COLLECTIONS=(
 readonly DB_NAME="model-ad"  # Target database name
 
 # Expected collections that will be cross-checked before import (including dataversion)
+# dataversion must stay last: it is swapped in last so that it only changes once
+# every other collection is serving the new release
 readonly EXPECTED_COLLECTIONS=("${COLLECTIONS[@]}" "dataversion")
 
 # Don't forget to add indexes in create-indexes.js
@@ -46,6 +48,15 @@ readonly EXPECTED_COLLECTIONS=("${COLLECTIONS[@]}" "dataversion")
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly WORKING_DIR="${SCRIPT_DIR}"
 readonly DATA_DIR="${WORKING_DIR}/data"
+
+# Source logging utilities first, so error() is defined for the argument checks
+# below. error() isn't available until this succeeds, so the fallback uses echo.
+if [ -f "${SCRIPT_DIR}/utils/logging-utils.sh" ]; then
+    source "${SCRIPT_DIR}/utils/logging-utils.sh"
+else
+    echo "Error: utils/logging-utils.sh not found" >&2
+    exit 1
+fi
 
 ################################################################################
 # SCRIPT ARGUMENTS AND VALIDATION
@@ -74,7 +85,7 @@ DB_PASS="$5"
 # Validate non-empty arguments
 for arg_name in BRANCH SYNAPSE_PASSWORD DB_HOST DB_USER DB_PASS; do
     if [ -z "${!arg_name}" ]; then
-        error "Error: $arg_name cannot be empty"
+        error "$arg_name cannot be empty"
         exit 1
     fi
 done
@@ -87,20 +98,14 @@ export -n SYNAPSE_PASSWORD DB_USER DB_PASS 2>/dev/null || true
 ################################################################################
 
 # Create secure MongoDB connection string - credentials passed separately
-readonly MONGO_URI="mongodb://${DB_HOST}/${DB_NAME}?authSource=admin"
+# retryWrites=false: DocumentDB only supports retryable writes from engine
+# 8.0.2, and mongosh enables them by default, so writes fail without it
+readonly MONGO_URI="mongodb://${DB_HOST}/${DB_NAME}?authSource=admin&retryWrites=false"
 readonly MONGO_USER="$DB_USER"
 readonly MONGO_PASS="$DB_PASS"
 
 # Clear original credential variables for security
 unset DB_USER DB_PASS
-
-# Source logging utilities
-if [ -f "${SCRIPT_DIR}/utils/logging-utils.sh" ]; then
-    source "${SCRIPT_DIR}/utils/logging-utils.sh"
-else
-    error "Error: utils/logging-utils.sh not found"
-    exit 1
-fi
 
 # Source synapse utilities
 if [ -f "${SCRIPT_DIR}/utils/synapse-utils.sh" ]; then
@@ -127,6 +132,10 @@ cleanup() {
     local exit_code=$?
     if [ $exit_code -ne 0 ]; then
         error "Script failed with exit code $exit_code"
+        # Staging collections are deliberately left in place for inspection;
+        # the next run drops them before importing
+        warn "Any staging collections from this run were left behind and will be"
+        warn "dropped at the start of the next run"
     fi
     # Add any cleanup operations here if needed
     exit $exit_code
@@ -217,6 +226,11 @@ fi
 # Start database operations timing
 DB_START_TIME=$(date +%s)
 
+log_database_storage "$MONGO_URI" "$MONGO_USER" "$MONGO_PASS" "before import"
+
+# Clear any staging collections a previously failed run left behind
+drop_staging_collections "$MONGO_URI" "$MONGO_USER" "$MONGO_PASS"
+
 # Clean up orphaned collections before import
 cleanup_orphaned_collections "$MONGO_URI" "$MONGO_USER" "$MONGO_PASS" "${EXPECTED_COLLECTIONS[@]}"
 
@@ -225,19 +239,33 @@ cleanup_orphaned_collections "$MONGO_URI" "$MONGO_USER" "$MONGO_PASS" "${EXPECTE
 ################################################################################
 
 # Import synapse data to database
-log "Starting MongoDB data import..."
+# Everything is loaded and indexed in staging collections first, so the live
+# collections keep serving the previous release until the swap below
+log "Starting MongoDB data import into staging collections..."
 
 # Import collections from array
 for collection in "${COLLECTIONS[@]}"; do
     file="${DATA_DIR}/${collection}.json"
-    import_collection "$MONGO_URI" "$MONGO_USER" "$MONGO_PASS" "$collection" "$file" "--jsonArray"
+    import_staging_collection "$MONGO_URI" "$MONGO_USER" "$MONGO_PASS" "$collection" "$file" "--jsonArray"
 done
 
 log "Importing dataversion from ${DATAVERSION_PATH}"
-import_collection "$MONGO_URI" "$MONGO_USER" "$MONGO_PASS" "dataversion" "$DATAVERSION_PATH" "$DATAVERSION_FLAG"
+import_staging_collection "$MONGO_URI" "$MONGO_USER" "$MONGO_PASS" "dataversion" "$DATAVERSION_PATH" "$DATAVERSION_FLAG"
 
-# Create database indexes
-create_database_indexes "$MONGO_URI" "$MONGO_USER" "$MONGO_PASS" "$WORKING_DIR/create-indexes.js"
+# Create indexes on the staging collections, before they are swapped in
+create_staging_indexes "$MONGO_URI" "$MONGO_USER" "$MONGO_PASS" "$WORKING_DIR/create-indexes.js"
+
+################################################################################
+# ATOMIC SWAP
+################################################################################
+
+# The live collections are only touched from here on, once every staging
+# collection has loaded, so any failure above leaves the previous release live
+verify_staging_collections "$MONGO_URI" "$MONGO_USER" "$MONGO_PASS" "${EXPECTED_COLLECTIONS[@]}"
+
+swap_staging_collections "$MONGO_URI" "$MONGO_USER" "$MONGO_PASS" "${EXPECTED_COLLECTIONS[@]}"
+
+log_database_storage "$MONGO_URI" "$MONGO_USER" "$MONGO_PASS" "after swap"
 
 ################################################################################
 # COMPLETION AND SUMMARY
