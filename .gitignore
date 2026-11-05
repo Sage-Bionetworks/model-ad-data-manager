@@ -113,3 +113,9 @@ package-*.json
 # secrets
 *.pem
 *.key
+
+# local AWS configuration/credentials
+.aws/
+
+# local scratch files
+tmp/

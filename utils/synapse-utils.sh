@@ -73,7 +73,8 @@ download_manifest_files() {
 
     local current_file=0
 
-    while IFS=, read -r id version; do
+    # Process manifest line by line, handling files without trailing newlines
+    while IFS=, read -r id version || [ -n "$id" ]; do
         current_file=$((current_file + 1))
         local progress_percent=$((current_file * 100 / total_files))
         log "[$progress_percent%] Downloading file $current_file/$total_files: $id,$version"

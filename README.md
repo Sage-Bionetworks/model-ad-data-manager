@@ -28,6 +28,38 @@ To deploy an updated data version to the Model-AD production database:
 2. The Github action CI system automatically updates the dev DB
 
 
+# Atomic imports
+
+A data release reloads the database while the app and API containers keep
+running, so an import must never leave the APIs reading half-loaded data.
+`import-data.sh` therefore never writes to a live collection:
+
+1. Any staging collections left behind by a failed run are dropped.
+2. Each collection is imported into `<collection>_staging`, and its indexes
+   from `create-indexes.js` are built there.
+3. Every staging collection is checked for documents. If any is missing or
+   empty the run aborts, leaving the previous release live.
+4. Each staging collection is renamed over its live collection. A rename is a
+   metadata-only operation that also carries the indexes across, so a
+   collection goes straight from the previous release to the new one and is
+   never served unindexed.
+5. `dataversion` is renamed last, so it only changes once every other
+   collection is serving the new release.
+
+Two things to know when running a release:
+
+* The imported data is stored twice between step 2 and step 4, so check the
+  collection sizes against the cluster's free storage before a large release.
+* The renames run back to back in one database session but are not a single
+  transaction, so there is a window of milliseconds in which some collections
+  are on the new release and the rest are on the previous one.
+
+The swap relies on `renameCollection` with `dropTarget`, which Amazon
+DocumentDB does not document. It was verified on the dev cluster (engine
+8.0.0) in MG-1171, including that indexes and collation indexes carry across.
+The import connects with `retryWrites=false`, because DocumentDB only supports
+retryable writes from engine 8.0.2 and `mongosh` enables them by default.
+
 # Setup
 
 ## Secrets
@@ -115,8 +147,35 @@ Enter name of work folder: [press Enter for _work]
 
 √ Settings Saved.
 ```
+* Before installing the service, make it restart itself if it is killed for running out of memory. By default, systemd stops the whole service when any of its processes is killed by the out-of-memory (OOM) killer, and it stays stopped. Paste this block as is. It applies to the runner service for every environment, so nothing needs changing per environment, and `svc.sh install` loads it.
+```text
+sudo mkdir -p /etc/systemd/system/actions.runner.Sage-Bionetworks-model-ad-data-manager.model-ad-bastion-.service.d
+sudo tee /etc/systemd/system/actions.runner.Sage-Bionetworks-model-ad-data-manager.model-ad-bastion-.service.d/oom.conf <<'EOF'
+[Service]
+OOMPolicy=continue
+Restart=always
+RestartSec=15
+EOF
+```
 * Setup the [GH runner agent to run as a service](https://docs.github.com/en/actions/hosting-your-own-runners/managing-self-hosted-runners/configuring-the-self-hosted-runner-application-as-a-service)
 * Run the agent and then check the [GH Runners page](https://github.com/Sage-Bionetworks/model-ad-data-manager/settings/actions/runners) to make sure that the runner is in `Idle` status.
+
+### Troubleshooting self hosted runners
+
+If release jobs stay queued, the runner for that environment is offline. Check its service on the bastion:
+
+```text
+sudo journalctl -u 'actions.runner.*' -n 30 --no-pager
+```
+
+| Message in the journal | Cause | Fix |
+| --- | --- | --- |
+| `killed by the OOM killer` and `Failed with result 'oom-kill'` | The bastion ran out of memory, for example during a Systems Manager patch run, and systemd stopped the service | Add the drop-in from the setup steps, then `sudo systemctl daemon-reload`, `sudo systemctl reset-failed 'actions.runner.*'` and `sudo ./svc.sh start` |
+| `The runner registration has been deleted from the server` | GitHub deletes runners that haven't connected for 14 days | Run `./config.sh remove --local` to clear the old configuration, then get a new token from the runners page and run `config.sh` again. Add `--replace` if GitHub still lists a runner with that name |
+
+The runner gives up after 10 failed retries in a row. After fixing the cause, start it again with `sudo ./svc.sh start`.
+
+Because of the 14-day rule, a bastion left stopped for more than two weeks loses its registration. Before a release, check that the runner shows as `Idle`.
 
 [db_update]: model-ad-db-update.drawio.png "update diagram"
 [github_secrets]: github_secrets.png "github secrets screen"
